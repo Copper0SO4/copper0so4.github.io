@@ -1,0 +1,15 @@
+<section class="card-base rounded-[var(--radius-large)] px-6 md:px-9 py-6 mb-4" aria-labelledby="comments-title" data-pagefind-ignore>
+    <h2 id="comments-title" class="text-xl font-bold text-black/90 dark:text-white/90 mb-4">评论</h2>
+    <div data-giscus-path={Astro.url.pathname}></div>
+    <noscript>请启用 JavaScript 以加载评论。</noscript>
+</section>
+
+<style is:global>
+    /* Keep sizing available after Swup replaces client.js's injected head stylesheet. */
+    #giscus-container .giscus-frame {
+        width: 100%;
+        min-height: 150px;
+        border: 0;
+        color-scheme: normal;
+    }
+</style>
