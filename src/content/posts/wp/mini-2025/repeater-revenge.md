@@ -2,13 +2,11 @@
 title: "复读机的复仇"
 published: 2026-10-24
 description: "利用单字节越界修改 Saved RBP，构造假栈与 ret2libc 链。"
-tags: ["CTF", "Mini 2025", "Pwn", "off-by-one", "栈迁移"]
+tags: ["CTF", "Vidar-Team", "HGAME mini 2025", "Pwn", "off-by-one", "栈迁移"]
 category: "CTF Writeup"
 draft: false
 lang: "zh_CN"
 ---
-
-> 本文整理自 Mini 2025 WP 笔记。Flag 与服务器地址、连接端口已脱敏；远程连接代码中的占位符需替换后使用。
 
 
 > 复读机回来了,但是它的输出更混乱了
@@ -56,7 +54,11 @@ ssize_t vuln()
 
 在小端机器下（大部分情况），低位字节存在低位内存，也就是说`0x12345678`在内存中的实际存储方形式是`0x78563412`，因此，我们能通过 read 覆写的地址就是Main RBP的末尾一个字节。
 
+（Codex: `0x12345678` 按地址递增存放的是 `78 56 34 12` 四个字节，数值本身仍是 0x12345678；被覆盖的是 Saved RBP 的最低有效字节。）
+
 修改内存上备份的Main RBP有什么用呢？我们知道函数在退出的时候会先`mov rsp, rbp; pop rbp; ret`，也就是将保存的RBP寄存器的值重新赋值回去，这样我们就达成了修改main函数的帧栈的结果。然而我们无法修改 vuln() 函数运行的时候的RSP和RBP，因为在进入函数的时候会执行`push rbp; mov rbp, rsp`这样一段指令，将我们污染过的rbp重新放回Saved RBP的地方。
+
+（Codex: 覆盖 Saved RBP 不会立即改变当前 RBP；直到 vuln 退出时执行 pop rbp，main 才会拿到被污染的值，不是函数入口重新保存造成的。）
 
 但是，main函数在退出的时候同样也会执行`leave`指令，也就是上述的`mov rsp, rbp; pop rbp;`，在这个时候，会把rbp赋值给了rsp，结果这个时候，我们成功在main返回的时候修改了rsp寄存器的值，而在函数退出的时候，会从rsp弹出返回地址，因此我们就拿到了一定范围内控制RIP的能力（因为只能写最低位字节的内存地址）。
 
@@ -71,6 +73,8 @@ ssize_t vuln()
 工作原理是，把RSP移动到假栈的头之后，还要`pop rbp`，所以我们在前面放一个p64(0)来让它pop, 然后`ret`，rip移动到我们的gadget `pop rdi; ret`，这个时候RSP放在sh的地址那里，然后`pop rdi`，将sh的地址存入rdi, 作为传入函数的第一个参数，然后再`ret`，跳转执行system，传入的是sh的地址，所以实际上执行的函数是system("/bin/sh")，也就是拿到shell了。
 
 由于main函数还分配了一个计数器，所以我们实际上要在假栈前放一个p32(1)来伪造一个计数器，这个是简单的。
+
+（Codex: 伪造计数器是为了让 main 使用被污染的 RBP 访问 `[rbp-4]` 时仍能退出循环；不是所有栈迁移都要放一个计数器。）
 
 ### 泄露栈地址和 libc 返回地址
 
@@ -98,10 +102,14 @@ for offset in range(1024, 1088, 8):
 第一个`0x400`对应的就是saved rbp, `0x408`就是紧跟着的返回main的地址
 根据汇编推算`1024 1032 1040 1048 1056 1064`这六个地址，前面2个是saved rip和rbp, 然后我们看到汇编有`sub rsp, 10h`那么就是16个字节，加上main函数的saved rbp和分配的一个int和地址对齐，就是16+8+8=24的字节，所以实际上的libc返回地址对应的是1024+8+8+24=1064, 也就是上面的0x428就是实际上的libc返回地址。
 
+（Codex: 这里算式写乱了：main 局部区 16 字节加 Saved RBP 8 字节，共 24 字节，所以偏移是 `1024 + 8 + 8 + 16 + 8 = 1064`；原文的 16+8+8 实际是 32。）
+
 ### 计算 libc 基址
 
 接下来要想获取libc的基址，就只需要知道偏移量，这个很简单，我们直接用pwntools提供的工具查看一下我们目前本地机器上libc的加载地址
 `libc_load_address = list(p.libs().items())[1][1]`
+
+（Codex: `p.libs()` 的第 2 项不保证是 libc，应按实际 libc 路径查找，不能依赖字典顺序。[参考](https://docs.pwntools.com/en/stable/tubes/processes.html#pwnlib.tubes.process.process.libs)）
 
 这样我们减一下，就能知道libc调用main后返回地址的偏移量。至于为什么不直接读取远程端的libc加载基址，是因为我们只能和远端的IO打交道，然而我们有同样的libc，所以main函数返回的地址只距离Libc加载基址的偏移量是恒定的，同时我们能诱导程序主动吐出main函数返回libc的地址，由此就可以在第一次让程序吐出libc的地址的时候，直接减去我们在本地程序中算出的偏移量。也就是：
 `offset = libc_return_address - libc_load_address`
@@ -123,6 +131,8 @@ binsh = libc_return_address - offset + binsh_offset
 ### 构造 payload
 
 这样我们整个流程就构造好了，我们只需要计算rsp写0后的位置，在第二次写入的时候让payload前面先塞很多字符，到达rsp前面-4的位置（也就是[moddified_rsp - 4]），因为main中还有个计数器，我们再加一个p32(1)，然后接着塞入我们刚才预先说好的假栈，然后填充到1024字符的时候，最后一个字节写0，也就是Saved RSP的位置
+
+（Codex: 最后写零覆盖的是 Saved RBP 的最低字节，不是 Saved RSP；随后 main 执行 leave，才会间接改变 RSP。）
 
 ## exp
 
@@ -212,6 +222,9 @@ p.interactive()
 ### 调整栈对齐
 
 实际执行后发现出现了`Got EOF while reading in interactive`，这大概是栈对齐的原因，我们在gadget前添加一个ret（这个程序内为0x40101a）
+
+（Codex: EOF 只能说明连接已结束，不能单凭它确定是栈对齐问题；这里仍需结合崩溃现场验证。）
+
 ```python
 from pwn import *
 

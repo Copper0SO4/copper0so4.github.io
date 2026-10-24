@@ -2,13 +2,11 @@
 title: "Stack Master Salute!"
 published: 2026-10-24
 description: "构造 SigreturnFrame，分阶段写入并迁移到 BSS 完成 SROP。"
-tags: ["CTF", "Mini 2025", "Pwn", "SROP"]
+tags: ["CTF", "Vidar-Team", "HGAME mini 2025", "Pwn", "SROP"]
 category: "CTF Writeup"
 draft: false
 lang: "zh_CN"
 ---
-
-> 本文整理自 Mini 2025 WP 笔记。Flag 与服务器地址、连接端口已脱敏；远程连接代码中的占位符需替换后使用。
 
 > Do you know SROP?
 
@@ -75,11 +73,19 @@ signed __int64 vuln()
 
 这道题倒是和以往不一样，没有明确的和之前差不多的gadget可以利用，不过题目说了SROP，并且我们找到了`0x0000000000401185 : mov rax, 0xf ; ret`这一句，是将rax修改成15，而15恰好在syscall中对应的是rt_sigreturn，这就是我们所需要利用的SROP漏洞，S代表SigReturn。
 
+（Codex: SROP 指 Sigreturn Oriented Programming；它利用信号返回机制恢复伪造上下文，不能把 rt_sigreturn 本身称为漏洞。）
+
 SigReturn是AMD64 Linux下系统用来解决程序接收进程信号后处理信号后要返回原先执行的位置和状态的需求的工具，它非常有用，如果我们直接执行这个函数，就能伪造一个假的SigreturnFrame，让rt_sigreturn读取，能够控制很多寄存器状态。我们把它放到栈内，就能让函数读取它。
+
+（Codex: 这里实际通过 `rax=15; syscall` 进入内核恢复上下文，并不是普通 C 函数调用；还需要合法的伪造信号帧。[参考](https://man7.org/linux/man-pages/man2/sigreturn.2.html)）
 
 因此，我们可以设置rax为59，也就是execve，并将RIP修改到syscall上，但是我们还缺少sh的地址得想办法获取一块能稳定写入存放的地址，我们可以直接利用.bss，通常来说.bss是ELF 程序中用来存放未初始化或零初始化的全局变量、静态变量的区域，因此它比较稳定。
 
+（Codex: BSS 的绝对地址不会因为“属于 BSS”就固定；这里还需主程序未启用 PIE，或已经知道加载基址。）
+
 这样我们的流程就很清晰了，第一次构造payload覆盖返回地址执行rt_sigreturn的gadget, 加上syscall的gadget，并构造能写入和迁移到.bss的Sigreturn Frame，也就是执行read，目标地址是.bss，然后在第二次payload构造同样的两个gadget, 不过后面替换成execve的SigReturn Frame和binsh的地址。
+
+（Codex: 两阶段衔接还取决于 syscall 后面的指令如何使用 RSP/RBP；仅有这段伪代码，无法确认下方不加填充的 payload 和栈迁移一定成立。）
 
 ## exp
 ```python
@@ -136,6 +142,8 @@ sleep(0.5)
 p.interactive()
 ```
 为了防止两次payload发送太快，中间sleep了一下
+
+（Codex: sleep 只能降低两次输入被同一次 read 读走的概率，不能保证分阶段，也不能避免短读。[参考](https://man7.org/linux/man-pages/man2/read.2.html)）
 
 远端只需要把上面那段 `process` 换成 `remote`，其它一个字都不用改
 ```python

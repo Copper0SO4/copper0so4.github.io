@@ -2,13 +2,11 @@
 title: "the ARMed stack"
 published: 2026-10-24
 description: "分析 ARM 栈溢出，通过返回地址跳转至 secret 函数。"
-tags: ["CTF", "Mini 2025", "Pwn", "ARM", "栈溢出"]
+tags: ["CTF", "Vidar-Team", "HGAME mini 2025", "Pwn", "ARM", "栈溢出"]
 category: "CTF Writeup"
 draft: false
 lang: "zh_CN"
 ---
-
-> 本文整理自 Mini 2025 WP 笔记。Flag 与服务器地址、连接端口已脱敏；远程连接代码中的占位符需替换后使用。
 
 > the elf armed itself🤔
 
@@ -46,7 +44,11 @@ void secret(void)
 
 非常简单的栈溢出，Arm和AMD64类似，都是保存的栈帧和返回地址，只是Arm中通常叫做R11和LR。
 
+（Codex: 32 位 Arm 的返回地址先放在 LR（r14），是否压栈取决于函数；帧指针也可能是 r7，而不一定是 r11。[参考](https://github.com/ARM-software/abi-aa/blob/main/aapcs32/aapcs32.rst)）
+
 secret的地址是0x27c，不过Arm中需要最低位表示Thumbs状态，我们置1改成0x27d
+
+（Codex: 名称应为 Thumb；最低位置 1 适用于这里的 Thumb 目标，不能对所有 Arm 函数一律加 1。下文 16 字节偏移也需从实际栈布局确认。）
 
 ## exp
 ```python

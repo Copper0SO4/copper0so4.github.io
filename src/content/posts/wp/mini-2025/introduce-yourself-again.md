@@ -2,13 +2,11 @@
 title: "Introduce Yourself Again"
 published: 2026-10-24
 description: "利用 ROP 设置函数参数，调用 system 获取 Shell。"
-tags: ["CTF", "Mini 2025", "Pwn", "栈溢出", "ROP"]
+tags: ["CTF", "Vidar-Team", "HGAME mini 2025", "Pwn", "栈溢出", "ROP"]
 category: "CTF Writeup"
 draft: false
 lang: "zh_CN"
 ---
-
-> 本文整理自 Mini 2025 WP 笔记。Flag 与服务器地址、连接端口已脱敏；远程连接代码中的占位符需替换后使用。
 
 > close the door and introduce yourself again
 
@@ -38,6 +36,8 @@ ssize_t vuln()
 ```
 
 恰好在0x401283有我们需要的gadget，我们只需要把Saved RIP覆盖成上文gadget后，加上我们能寻找到的已有的/bin/sh的字符串，也就是字符串0x402008加上偏移量24，然后执行system，在这题中可以是0x401189
+
+（Codex: `0x401189` 是否是合适的 system 调用入口，还需看汇编；跳进函数中间时，要额外确认栈对齐和后续指令。）
 
 ## exp
 ```python

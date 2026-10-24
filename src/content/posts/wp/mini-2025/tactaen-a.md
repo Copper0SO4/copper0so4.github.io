@@ -2,13 +2,11 @@
 title: "tactaen A"
 published: 2026-10-24
 description: "分析字符串比较，通过 pwntools 发送不可打印字符。"
-tags: ["CTF", "Mini 2025", "Pwn", "逆向分析"]
+tags: ["CTF", "Vidar-Team", "HGAME mini 2025", "Pwn", "逆向分析"]
 category: "CTF Writeup"
 draft: false
 lang: "zh_CN"
 ---
-
-> 本文整理自 Mini 2025 WP 笔记。Flag 与服务器地址、连接端口已脱敏；远程连接代码中的占位符需替换后使用。
 
 >你遇到了一只奇怪的猫，他在找一些键盘上没有的字符🐈
 >(~~IDA may help you~~)

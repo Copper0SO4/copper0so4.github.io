@@ -2,13 +2,11 @@
 title: "Dis-Terminus C"
 published: 2026-10-24
 description: "分析迷你编译器的虚拟机，通过越界写修改数组指针与函数指针。"
-tags: ["CTF", "Mini 2025", "Pwn", "虚拟机", "越界写"]
+tags: ["CTF", "Vidar-Team", "HGAME mini 2025", "Pwn", "虚拟机", "越界写"]
 category: "CTF Writeup"
 draft: false
 lang: "zh_CN"
 ---
-
-> 本文整理自 Mini 2025 WP 笔记。Flag 与服务器地址、连接端口已脱敏；远程连接代码中的占位符需替换后使用。
 
 >[**数据删除**]写了一个迷你编译器，支持五条指令：
 >
@@ -186,6 +184,8 @@ typedef struct Runtime {
 
 因此内存上的布局大概是`16字节的Locals*??? -> 8字节的数组长度 -> 8字节的数组栈顶指针 -> 8字节的数组指针 -> 16字节的数组元素*??? -> 8字节的函数指针 * ???`
 
+（Codex: ObjArray 的第二个字段 cap 是容量，不是“数组栈顶指针”；第三个字段 items 才是数据指针。）
+
 ## 测试
 首先，知道locals后面就是数组长度和数组指针那些，而程序每次运行结束后都会输出目前数组指针的位置，因此，我们可以通过测试分配多少个变量能修改到后面的数组指针，来查看从locals[0]到数组指针的位置，从而推算Locals的实际大小
 
@@ -194,6 +194,8 @@ typedef struct Runtime {
 因此，第一个???就是16。
 
 然后如果我们想要看arr_items实际上有几个，我们可以试着看到多少个的时候会覆盖到natives，导致print执行失败。不过试了才发现arr[8]赋值的时候程序直接以Out of bounds为由拒绝操作，所以合理推测第二个???是8
+
+（Codex: `arr[8]` 越界只能直接说明当前 arr.len 为 8，不能单凭这一点确定底层 arr_items 也只分配了 8 个元素。）
 
 因此，
 ```c
@@ -208,8 +210,13 @@ typedef struct Runtime {
 
 所以，如果我们想要修改natives[0]，可以推算一下以16为步长的话，到达natives的时候实际上为locals[25]，并且不巧的是覆盖到natives[0]的部分是Value的类型部分，我们无法控制它的值，我们可以控制natives[1]，不过我们不知道OP_CREDITS如何触发，因此，我们可以换一条路径，我们可以修改arr中的item指针的值，让它指向后面的的位置（偏移量0x80），从而指向native[0]，再使用arr[0]修改它的值。恰好有个backdoor函数位于0x402079。
 
+（Codex: 按上述 64 位布局，natives[0] 在偏移 0x198，确实对应 locals[25] 的 type；但 arr[0] 赋值会写整个 16 字节 Value，也会覆盖旁边的 natives[1]。）
+
 ## 实操
 运行时`arr_items @ 0x31ac1128`，以此推算出需要改到的位置，然后构建输入内容
+
+（Codex: 这段地址与下方日志不是同一次运行的值；下方使用的是 `0x364e3b8 + 0x80 = 0x364e438`，不能混用。）
+
 ```zsh
 ❯ nc HOST_REDACTED PORT_REDACTED
 

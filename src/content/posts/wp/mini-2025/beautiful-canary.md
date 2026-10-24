@@ -2,13 +2,11 @@
 title: "Beautiful Canary"
 published: 2026-10-24
 description: "利用两次输入泄露并恢复 Canary，再覆盖返回地址。"
-tags: ["CTF", "Mini 2025", "Pwn", "Canary", "栈溢出"]
+tags: ["CTF", "Vidar-Team", "HGAME mini 2025", "Pwn", "Canary", "栈溢出"]
 category: "CTF Writeup"
 draft: false
 lang: "zh_CN"
 ---
-
-> 本文整理自 Mini 2025 WP 笔记。Flag 与服务器地址、连接端口已脱敏；远程连接代码中的占位符需替换后使用。
 
 > Can you find canary?
 
@@ -54,7 +52,11 @@ return v4 - __readfsqword(0x28u);
 ```
 可以看到这里将栈上保存的Canary, 也就是上面的v4复制到rax，然后减去内存中FS+28（也就是最开始从这里拿到v4的值），如果是1，就直接跳转到后面的+252的leave；如果是0，那就是执行后面的`__stack_chk_fail`直接终止程序。简单来说，就是检查v4这个canary的值有没有被修改，如果有，就终止程序，而我们看到上面标的v4在rbp-8的位置，如果我们要像是之前那样直接覆盖Saved RIP修改返回地址，那必然会修改到v4的值，从而导致程序直接罢工。
 
+（Codex: 这里把条件写反了：减法结果为 0 时 ZF=1，`je` 跳过报错；结果非 0 才会调用 `__stack_chk_fail`。）
+
 因此，这道题目给了我们两次的输入输出机会，我们可以在第一次输入输出流程中让printf把Canary输出，通常来说，Canary的第一个字节会是b"\x00"，这就是为了让puts和printf这样子的函数不要继续往后读取，但是，我们可以通过栈溢出，修改Canary的第一个字节，然后让printf输出剩下的后面7个字节，从而拼凑出一整个canary的值，接着在第二次输入的时候恢复canary的值，并在后面修改返回地址。至于修改成什么，这个可执行文件提供了一个backd00r函数执行sh，不需要我们再想办法getshell。
+
+（Codex: 泄露后面 7 字节并非必然成功：遇到 `\x00` 会提前结束字符串，遇到 `\x0a` 则会让下文的 `recvline()` 提前返回。）
 
 # exp
 考虑栈对齐后

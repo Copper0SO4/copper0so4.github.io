@@ -2,13 +2,11 @@
 title: "Share Interesting Things"
 published: 2026-10-24
 description: "利用 read 返回值设置系统调用号，通过 syscall 执行 execve。"
-tags: ["CTF", "Mini 2025", "Pwn", "ROP", "syscall"]
+tags: ["CTF", "Vidar-Team", "HGAME mini 2025", "Pwn", "ROP", "syscall"]
 category: "CTF Writeup"
 draft: false
 lang: "zh_CN"
 ---
-
-> 本文整理自 Mini 2025 WP 笔记。Flag 与服务器地址、连接端口已脱敏；远程连接代码中的占位符需替换后使用。
 
 >TELL ME TELL ME
 > *题面外链图片已移除（原链接包含服务器地址）。*
@@ -49,9 +47,13 @@ ssize_t vuln()
 ```
 似乎是空的，所以这个大概就是题目给我们的一块桌面，供我们自由操作的。
 
+（Codex: IDA 的 `db ?` 表示未初始化的数据，不代表没有内存；BSS 在程序加载时会被清零。）
+
 ## 攻击原理
 
 我们知道，寄存器rax是作为传递函数返回值用的，而read函数的返回值恰好就是读入字符的数量，同时，rax同样是Linux下syscall的一个调用参数，这题目中没有引入libc的system函数，无法执行指令，所以，我们可以绕过system, 直接使用syscall编号为59的execve来执行我们想要的程序，因此，我们可以在最后一个read的时候输入恰好59个字符，在第一个输入的时候，篡改返回地址，让它执行类似`pop rdi; syscall`一样的指令，其中，我们在第一个输入的时候，在篡改返回地址后再加一个“/bin/sh”的地址，这样，执行`pop rdi`的时候，就会把sh的地址存入rdi寄存器，也就是Linux AMD64 ABI下的函数的第一个参数，最终产生execve("/bin/sh")的效果 ，成功getshell。
+
+（Codex: 这里关键是最后一次 read 实际返回 59，而不只是发送了 59 字节；read 可能短读。另外 x86-64 Linux 的 rax 放系统调用号，execve 还需要 rsi、rdx 两个参数。[参考](https://man7.org/linux/man-pages/man2/read.2.html)）
 
 我们可以用ROPgadget工具探查有什么类似`pop rdi; syscall`这样我们能利用的指令：
 ```zsh
@@ -79,6 +81,8 @@ ssize_t vuln()
 
 
 不过/bin/sh要哪里来呢，这就是我们说到的前面的桌面，也就是上述的str1。我们可以先输入/bin/sh\x00，之后再填充到59个字符，这样，我们就在内存中塞入了sh的地址，IDA显示str1的地址为`0x404080`，因此，我们上面说的sh的地址在这样写入后就是它。
+
+（Codex: 这里写入内存的是 `/bin/sh` 字符串本身；指向它的地址 `0x404080` 放在前一阶段的 ROP 链里。）
 
 ## exp
 ```python
