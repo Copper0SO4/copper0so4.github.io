@@ -1,0 +1,24 @@
+---
+import { getCollection } from "astro:content";
+import LibraryTree from "@components/LibraryTree.svelte";
+import MainGridLayout from "@layouts/MainGridLayout.astro";
+import { buildLibraryTree } from "@utils/library-utils";
+
+const posts = await getCollection("posts", ({ data }) =>
+	import.meta.env.PROD ? data.draft !== true : true,
+);
+const tree = buildLibraryTree(posts);
+---
+
+<MainGridLayout title="知识库" description="按文件夹浏览博客文章。">
+    <section class="card-base px-6 md:px-9 py-6 mb-4 min-w-0" aria-labelledby="library-title">
+        <header class="mb-5">
+            <h1 id="library-title" class="text-90 text-3xl font-bold mb-3 flex items-center gap-3">
+                <span class="w-1 h-6 rounded-full bg-[var(--primary)] shrink-0" aria-hidden="true"></span>
+                知识库
+            </h1>
+            <p class="text-50 text-sm">按文件夹浏览文章。</p>
+        </header>
+        <LibraryTree tree={tree} client:load />
+    </section>
+</MainGridLayout>
