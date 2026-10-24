@@ -1,9 +1,20 @@
 # About
-This is the demo site for [Fuwari](https://github.com/saicaca/fuwari).
 
-::github{repo="saicaca/fuwari"}
+你好！我是 Copper0SO4 👋
 
-> ### Sources of images used in this site
-> - [Unsplash](https://unsplash.com/)
-> - [星と少女](https://www.pixiv.net/artworks/108916539) by [Stella](https://www.pixiv.net/users/93273965)
-> - [Rabbit - v1.4 Showcase](https://civitai.com/posts/586908) by [Rabbit_YourMajesty](https://civitai.com/user/Rabbit_YourMajesty)
+目前就读于杭州电子科技大学，计算机科学与技术专业。
+
+## 💻 技术兴趣
+
+- Linux：Arch Linux、Niri
+- 编程：C、Python
+- 网络安全：CTF Pwn、逆向工程（一点点）
+
+## 📫 联系方式
+
+- [GitHub](https://github.com/Copper0SO4)
+
+## 📝 关于这个博客
+
+这个博客基于 Astro + Fuwari 构建，让 Codex 修了一些Bug
+通过 GitHub Pages 托管，使用 Giscus 提供评论功能。
