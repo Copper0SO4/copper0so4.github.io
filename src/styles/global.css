@@ -1,0 +1,7 @@
+/* Compile shared classes and their @apply consumers in the same stylesheet. */
+@import "./main.css";
+@import "./markdown.css";
+@import "./expressive-code.css";
+@import "./scrollbar.css";
+@import "./photoswipe.css";
+@import "./transition.css";
